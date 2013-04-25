@@ -3,7 +3,7 @@ HexEditor
 
 Hex Editor based on wxPython. It's a standalone application and a wxPython Panel can be embedded in other applications.
 
-Useage:
+Usage:
 
 
     from hexeditor import HexEditor
