@@ -1460,7 +1460,7 @@ if __name__ == '__main__':
 
         def OpenFile(self, filename=''):
             if filename:
-                pass
+                self.mainFrame.OpenFile(filename)
 
     def main(*args):
         application = HexEditorApp(None)
