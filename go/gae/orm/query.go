@@ -15,7 +15,7 @@ func NewQuery(query *datastore.Query, model *Model) *Query {
 	return &Query{query, model}
 }
 
-// Offset returns a derivative query that paginated
+// Paginate returns a derivative query that paginated
 func (self *Query) Paginate(page int, perPage int) *Query {
 	return self.Offset(page * perPage).Limit(perPage)
 }
@@ -70,7 +70,8 @@ func (self *Query) Ancestor(ancestor *datastore.Key) *Query {
 	return NewQuery(self.Query.Ancestor(ancestor), self.model)
 }
 
-// GetAll returns array of Model entires
+// GetAll returns array of Model entires, 
+// should convert to custom model type for custom functions
 func (self *Query) GetAll() ([]*Model, error) {
 	var result []Dict
 
@@ -82,11 +83,12 @@ func (self *Query) GetAll() ([]*Model, error) {
 	var entries []*Model
 
 	for i, key := range keys {
-		new_model := self.model.Clone(false)
-		new_model.key = key
-		new_model.Data = result[i]
+		newModel := self.model.Clone(false)
+		newModel.key = key
+		newModel.ParentKey = key.Parent()
+		newModel.Data = result[i]
 
-		entries = append(entries, new_model)
+		entries = append(entries, newModel)
 	}
 
 	return entries, nil

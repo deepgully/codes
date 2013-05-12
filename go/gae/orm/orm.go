@@ -1,3 +1,6 @@
+/*
+GAE datastore ORM
+*/
 package orm
 
 import (
@@ -6,8 +9,12 @@ import (
 	"reflect"
 )
 
+// Dict is type of map[string]interface{}
+// implement interface PropertyLoadSaver to support datastore Load&Save
 type Dict map[string]interface{}
 
+// PropertyLoadSaver can be converted from and to a sequence of Properties.
+// Load should drain the channel until closed, even if an error occurred.
 func (self Dict) Load(c <-chan datastore.Property) error {
 	for p := range c {
 		if p.Multiple {
@@ -24,6 +31,7 @@ func (self Dict) Load(c <-chan datastore.Property) error {
 	return nil
 }
 
+// Save should close the channel when done, even if an error occurred.
 func (self Dict) Save(c chan<- datastore.Property) error {
 	defer close(c)
 	for k, v := range self {
@@ -44,6 +52,7 @@ type Model struct {
 	Data      Dict
 }
 
+// Create a Model, bind to current appengine context and Kind
 func NewModel(c appengine.Context, kind string) *Model {
 	self := new(Model)
 	self.Context = c
@@ -93,6 +102,7 @@ func (self *Model) Query() *Query {
 }
 
 // Get Entry by Key, return nil if there is no such entry for the Key
+// should convert to custom model type for custom functions
 func (self *Model) Get(key *datastore.Key) *Model {
 	data := Dict{}
 	err := datastore.Get(self.Context, key, data)
@@ -100,11 +110,41 @@ func (self *Model) Get(key *datastore.Key) *Model {
 		return nil
 	}
 
-	new_model := NewModel(self.Context, self.Kind)
-	new_model.key = key
-	new_model.Data = data
+	newModel := NewModel(self.Context, self.Kind)
+	newModel.key = key
+	newModel.ParentKey = key.Parent()
+	newModel.Data = data
 
-	return new_model
+	return newModel
+}
+
+// GetMulti is a batch version of Get.
+// return []*Model, appengine.MultiError
+func (self *Model) GetMulti(keys []*datastore.Key) ([]*Model, appengine.MultiError) {
+	data := make([]Dict, len(keys))
+	for i := 0; i < len(keys); i++ {
+		data[i] = Dict{}
+	}
+
+	errs := datastore.GetMulti(self.Context, keys, data)
+
+	models := make([]*Model, len(keys))
+	for i, entry := range data {
+		if entry != nil {
+			newModel := NewModel(self.Context, keys[i].Kind())
+			newModel.key = keys[i]
+			newModel.ParentKey = keys[i].Parent()
+			newModel.Data = entry
+			models[i] = newModel
+		} else {
+			models[i] = nil
+		}
+	}
+
+	if errs, ok := errs.(appengine.MultiError); ok {
+		return models, errs
+	}
+	return models, nil
 }
 
 // Get Entry by string key
@@ -116,38 +156,72 @@ func (self *Model) GetByStrKey(strKey string) *Model {
 	return self.Get(key)
 }
 
+// Get Multi Entries by string keys
+func (self *Model) GetMultiByStrKeys(strKeys []string) ([]*Model, appengine.MultiError) {
+	keys := make([]*datastore.Key, len(strKeys))
+	for i, strKey := range strKeys {
+		key, _ := datastore.DecodeKey(strKey)
+		keys[i] = key
+	}
+	return self.GetMulti(keys)
+}
+
 // Get Entry by int64 id, return nil if there is no such entry for the Key
 func (self *Model) GetByID(intID int64) *Model {
 	key := datastore.NewKey(self.Context, self.Kind, "", intID, self.ParentKey)
 	return self.Get(key)
 }
 
+// Get Multi Entries by int64 ids
+func (self *Model) GetMultiByIDs(ids []int64) ([]*Model, appengine.MultiError) {
+	keys := make([]*datastore.Key, len(ids))
+	for i, id := range ids {
+		keys[i] = datastore.NewKey(self.Context, self.Kind, "", id, self.ParentKey)
+	}
+	return self.GetMulti(keys)
+}
+
 // Get Entry by key name, return nil if there is no such entry for the Key
-func (self *Model) GetByKeyName(keyname string) *Model {
-	key := datastore.NewKey(self.Context, self.Kind, keyname, 0, self.ParentKey)
+func (self *Model) GetByKeyName(keyName string) *Model {
+	key := datastore.NewKey(self.Context, self.Kind, keyName, 0, self.ParentKey)
 	return self.Get(key)
 }
 
+// Get Multi Entries by string key names
+func (self *Model) GetMultiByKeyNames(keyNames []string) ([]*Model, appengine.MultiError) {
+	keys := make([]*datastore.Key, len(keyNames))
+	for i, keyName := range keyNames {
+		keys[i] = datastore.NewKey(self.Context, self.Kind, keyName, 0, self.ParentKey)
+	}
+	return self.GetMulti(keys)
+}
+
+// Save entry
 func (self *Model) Save() (*datastore.Key, error) {
 	return datastore.Put(self.Context, self.Key(), &self.Data)
 }
 
-func (self *Model) GetItem(name string) interface{} {
-	return self.Data[name]
-}
-
-func (self *Model) UpdateItem(name string, value interface{}) {
-	self.Data[name] = value
-}
-
-func (self *Model) RemoveItem(name string) {
-	delete(self.Data, name)
-}
-
+// Delete entry
 func (self *Model) Delete() error {
 	return datastore.Delete(self.Context, self.Key())
 }
 
+// Get data item
+func (self *Model) GetItem(name string) interface{} {
+	return self.Data[name]
+}
+
+// Update data item
+func (self *Model) UpdateItem(name string, value interface{}) {
+	self.Data[name] = value
+}
+
+// Remove data item
+func (self *Model) RemoveItem(name string) {
+	delete(self.Data, name)
+}
+
+// Get one entry using filter, return nil if there is no such entity for the key
 func (self *Model) FilterOne(filterStr string, value interface{}) *Model {
 	query := self.Query().Filter(filterStr, value).Limit(1)
 
@@ -159,35 +233,9 @@ func (self *Model) FilterOne(filterStr string, value interface{}) *Model {
 	return entries[0]
 }
 
+// Check exist using filter
 func (self *Model) IsExist(filterStr string, value interface{}) bool {
 	query := self.Query().Filter(filterStr, value).Limit(1).KeysOnly()
 	count, _ := query.Count(self.Context)
 	return count > 0
-}
-
-type uploadFile struct {
-	*Model
-}
-
-// Upload File Store
-func UploadFile(c appengine.Context) *uploadFile {
-	file := new(uploadFile)
-	file.Model = NewModel(c, "UploadFile")
-	file.Data = Dict{
-		"Signature": "",
-		"BlobKey":   "",
-		"Hits":      int64(0),
-		"Active":    false,
-		"User":      "nobody",
-	}
-	return file
-}
-
-func Cast2UploadFile(model *Model) *uploadFile {
-	return &uploadFile{model}
-}
-
-func (self *uploadFile) ActiveFile() {
-	self.Data["Active"] = true
-	self.Save()
 }
