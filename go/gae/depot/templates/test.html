@@ -1,0 +1,137 @@
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=utf-8" />
+    <title>MagiCycles Depot Go version</title>
+    <style>  
+        body {
+            margin: auto;
+            padding: 0;
+            width: 998px;
+        }
+        #msg {
+            color:#FF0000;
+            margin:5px;
+        }
+        #upload {
+            position: absolute;
+            z-index: 98;
+        }
+        #fileinput {
+            display: block;
+            position: absolute;
+            cursor: pointer;
+            opacity: 0;
+            z-index: 99;
+            width:1px;
+        }
+    </style>
+    <script type="text/javascript" 
+        src="http://ajax.googleapis.com/ajax/libs/jquery/1.5/jquery.min.js">
+    </script>
+    <script type="text/javascript">
+        $(document).ready( function() {
+            var $msg = $('#msg');
+
+            var $fileinput = $("#fileinput");
+            var $uploadlink = $("#uploadlink");
+
+            
+            $uploadlink.hover( function () {
+                relocation_fileinput();
+            });
+            
+            $fileinput.change( function() {
+                if (!$fileinput.val()) {
+                    return false;
+                }
+                if (!check_file_ext($fileinput.val())) {
+                    alert("unsupported file type!");
+                    return false;
+                }
+                upload_file();
+            });
+
+            var relocation_fileinput = function() {
+                $fileinput.width($uploadlink.width());
+                $fileinput.height($uploadlink.height());
+                position = $uploadlink.offset();
+                $fileinput.css({
+                    left: position.left + "px",
+                    top: position.top +"px"
+                });
+            };
+
+            var check_file_ext = function(filename) {
+                var accepted_exts = "jpg,png,gif,jpeg,tiff,ico,bmp,jpe,kml,xml,gpx";
+                filename = filename.split('.');
+                var ext = filename[filename.length-1].toLowerCase();
+                return accepted_exts.indexOf(ext) >= 0;
+            };
+            
+            var upload_file = function(){
+                var signature = ''+(Math.round(Math.random()*10000)); 
+                //signature = '8091';
+                //_upload(signature);
+
+                $.getJSON("{{.CHECK_SIGN_URL}}?method=get_upload_signature&callback=?")
+                    .done(function(data){
+                        if (data.status=="ok") {
+                            signature = data.signature;
+                            _upload(signature);
+                        } else{
+                            alert(data.message);
+                        }
+                });
+
+                return false;
+            };
+
+            var _upload = function(signature) {
+                $("#signature").val(signature);
+
+                getuploadurl = "http://{{.Host}}/getuploadurl?signature=" +
+                                signature + "&callback=?";
+
+                jQuery.getJSON(getuploadurl, function(resp) {  //server response json format
+                    if (resp.status == "ok"){
+                        $msg.html(resp.upload_url);  //uploadurl from server reponse
+                        var upload_form = $("#upload_form")[0];
+                        upload_form.action = resp.upload_url;
+
+                        setTimeout(function(){
+                            upload_form.submit();
+                        }, 200);                            
+                    } else {
+                        alert(resp.message);
+                    }
+                });
+            };
+
+            window.upload_done = function(resp){
+                if (resp.status == "ok"){
+                    $msg.html(resp.file_url);
+                    $("#photo").attr("src",resp.file_url);  //fileurl from server reponse
+                } else {
+                    alert(resp.message);
+                }
+            };
+        });
+    </script>
+</head>
+<body>
+    <iframe name="framesubmit" id="framesubmit"  
+        style="display:none" width="0" height="0">
+    </iframe>
+    <h1>MagiCycles Depot Go version Upload Test</h1>
+    <div id="msg"></div>
+    <img id="photo" width=640/>
+    
+    <form id="upload_form" target="framesubmit" method="post" enctype="multipart/form-data">
+        <input type="hidden" id="signature" name="signature" value=""/>
+        <input type="hidden" name="notify_url" value="http://{{.Host}}/notify"/>
+        <input type="hidden" name="notify_callback" value="window.parent.upload_done"/>
+        <input id="fileinput" type="file" name="file"/>
+    </form>
+    <a id="uploadlink" href="javascript:;">upload</a>
+</body>
+</html>
