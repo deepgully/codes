@@ -1,0 +1,5 @@
+deb http://mirrors.oschina.net/ubuntu/ saucy main restricted universe multiverse
+deb http://mirrors.oschina.net/ubuntu/ saucy-backports main restricted universe multiverse
+deb http://mirrors.oschina.net/ubuntu/ saucy-proposed main restricted universe multiverse
+deb http://mirrors.oschina.net/ubuntu/ saucy-security main restricted universe multiverse
+deb http://mirrors.oschina.net/ubuntu/ saucy-updates main restricted universe multiverse

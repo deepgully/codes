@@ -1,13 +1,9 @@
 #!/bin/bash
 
-echo Config Locale...
-
-export LANGUAGE=en_US.UTF-8
-export LANG=en_US.UTF-8
-export LC_ALL=en_US.UTF-8
-locale-gen en_US.UTF-8
-sudo dpkg-reconfigure locales
-
+echo Setup apt-get
+sudo cp /etc/apt/sources.list /etc/apt/sources.list.old
+sudo cp apt-sources.list /etc/apt/sources.list
+sudo apt-get update
 
 echo Install keystone and mysql...
 
