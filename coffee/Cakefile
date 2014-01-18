@@ -1,0 +1,23 @@
+fs = require 'fs'
+
+{print} = require 'sys'
+{spawn} = require 'child_process'
+
+build = (callback) ->
+  coffee = spawn 'coffee', ['-c', '-o', 'lib', 'src']
+  coffee.stderr.on 'data', (data) ->
+    process.stderr.write data.toString()
+  coffee.stdout.on 'data', (data) ->
+    print data.toString()
+  coffee.on 'exit', (code) ->
+    callback?() if code is 0
+
+task 'build', 'Build lib/ from src/', ->
+  build(()->
+  	print "build done, server starting......\n"
+  	server = spawn 'node', ["lib/index.js"]
+  	server.stderr.on 'data', (data) ->
+    	process.stderr.write data.toString()
+    server.stdout.on 'data', (data) ->
+	    print data.toString()
+  )
