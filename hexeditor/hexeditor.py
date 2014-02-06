@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 # Copyright 2013 Gully Chen
 #
@@ -785,6 +786,8 @@ class HexEditor(wx.Panel):
         size = self.GetSize()
         sb_width = wx.SystemSettings.GetMetric(wx.SYS_VSCROLL_X)
         col_size = (size[0] - 150 - sb_width - self.grid.GetRowLabelSize()) / self.HexCols
+        if col_size < -1:
+            col_size = -1
         for col in xrange(self.grid.GetNumberCols() - 1):
             self.grid.SetColSize(col, col_size)
         self.grid.SetColSize(self.grid.GetNumberCols() - 1, 140)
